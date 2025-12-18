@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 const inventorySchema = require("../models/inventorySchema");
 
-// Sample products
 const PRODUCTS = [
   "Rice",
   "Oil",
@@ -20,11 +19,19 @@ async function seedInventoryForUser(userId) {
     const dbName = `marketplace_user_${userId}`;
     const uri = `${process.env.CONNECTION_STRING}/${dbName}`;
 
+
+    //yaha pe .createconnection ek new db ka reference return kr rha ha aur uss reference ke andar hum model bna rhe hai
     const conn = await mongoose.createConnection(uri);
 
     const Inventory = conn.model("Inventory", inventorySchema);
+    const count = await Inventory.countDocuments();
+    if (count > 0) {
+      await conn.close();
+      return;
+    }
 
-    const itemCount = 5 + Math.floor(Math.random() * 16);
+    const itemCount = 5 + Math.floor(Math.random() * 16); 
+    //5-20 tk ki range hogi itemCount mai
 
     const items = [];
 
@@ -36,7 +43,6 @@ async function seedInventoryForUser(userId) {
       });
     }
     await Inventory.insertMany(items);
-
     await conn.close();
 
     console.log(`Inventory seeded for user ${userId}`);
