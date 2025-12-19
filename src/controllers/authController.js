@@ -134,44 +134,56 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: "Email and password required" });
     }
 
-    const user = await User.findOne({ email, isDeleted: false });
-    if (!user) {
-      return res.status(Error.INVALID_CREDENTIALS.status_code).json({ message: Error.INVALID_CREDENTIALS.message });
+    let account = await User.findOne({ email, isDeleted: false });
+    let role = "USER";
+
+    if (!account) {
+      account = await Admin.findOne({ email });
+      role = "ADMIN";
     }
 
-    if (!user.isEmailVerified) {
+    if (!account) {
+      return res
+        .status(Error.INVALID_CREDENTIALS.status_code)
+        .json({ message: Error.INVALID_CREDENTIALS.message });
+    }
+
+    const isMatch = await bcrypt.compare(password, account.password);
+    if (!isMatch) {
+      return res
+        .status(Error.INVALID_CREDENTIALS.status_code)
+        .json({ message: Error.INVALID_CREDENTIALS.message });
+    }
+
+    if (role === "USER" && !account.isEmailVerified) {
       return res.status(403).json({ message: "Email not verified" });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(Error.INVALID_CREDENTIALS.status_code).json({ message:Error.INVALID_CREDENTIALS.message });
-    }
-
     const token = jwt.sign(
-      { userId: user._id },
+      { userId: account._id, role },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
     await Session.create({
-      userId: user._id,
+      userId: account._id,
       type: "LOGIN",
       token,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
 
     res.cookie("token", token, {
+      httpOnly: true,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     return res.status(200).json({
       message: "Login successful",
-
+      role,
     });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(Error.INTERNAL_SERVER.status_code).json({ message: Error.INTERNAL_SERVER.message });
   }
 };
 
