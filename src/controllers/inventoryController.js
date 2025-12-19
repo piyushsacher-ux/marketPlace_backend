@@ -79,5 +79,11 @@ exports.getMyInventory = async (req, res) => {
 
   await conn.close();
 
+  await Activity.create({
+    userId: req.userId,
+    action: "VIEW_INVENTORY",
+    date: new Date(),
+  });
+
   res.json({ page, count: items.length, items });
 };

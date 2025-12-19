@@ -2,9 +2,10 @@ const User = require("../models/userModel");
 const Error = require("../utils/error");
 const bcrypt = require("bcrypt");
 const Session = require("../models/sessionModel");
-const { generateOTP, hashOTP,compareOTP } = require("../utils/otp");
+const { generateOTP, hashOTP, compareOTP } = require("../utils/otp");
 const { sendOtpEmail } = require("../utils/mailer");
 const jwt = require("jsonwebtoken");
+const Activity = require("../models/activityModel");
 
 exports.register = async (req, res) => {
   try {
@@ -64,7 +65,7 @@ exports.register = async (req, res) => {
       expiresAt: new Date(Date.now() + 5 * 60 * 1000),
     });
 
-     await sendOtpEmail({
+    await sendOtpEmail({
       to: user.email,
       name: user.username,
       otp,
@@ -172,6 +173,12 @@ exports.login = async (req, res) => {
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
 
+    await Activity.create({
+      userId: account._id,
+      action: "LOGIN",
+      date: new Date(),
+    });
+
     res.cookie("token", token, {
       httpOnly: true,
       maxAge: 7 * 24 * 60 * 60 * 1000,
@@ -183,7 +190,8 @@ exports.login = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    return res.status(Error.INTERNAL_SERVER.status_code).json({ message: Error.INTERNAL_SERVER.message });
+    return res
+      .status(Error.INTERNAL_SERVER.status_code)
+      .json({ message: Error.INTERNAL_SERVER.message });
   }
 };
-

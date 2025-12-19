@@ -1,7 +1,9 @@
 const Error = require("../utils/error");
-const Transaction=require("../models/transactionModel")
-const getUserDb=require("../utils/getUserDb");
+const Transaction = require("../models/transactionModel");
+const getUserDb = require("../utils/getUserDb");
 const inventorySchema = require("../models/inventorySchema");
+const Activity = require("../models/activityModel");
+
 exports.purchaseItem = async (req, res) => {
   try {
     const buyerId = req.userId;
@@ -15,43 +17,48 @@ exports.purchaseItem = async (req, res) => {
       return res.status(400).json({ message: "Cannot buy your own item" });
     }
 
-    const conn=await getUserDb(sellerId);
-    const Inventory=conn.model("Inventory",inventorySchema)
+    const conn = await getUserDb(sellerId);
+    const Inventory = conn.model("Inventory", inventorySchema);
 
-    const item=await Inventory.findOne({
-        _id:itemId,
-        isDeleted:false
-    })
+    const item = await Inventory.findOne({
+      _id: itemId,
+      isDeleted: false,
+    });
 
-    if(!item){
-        await conn.close();
-        return res.status(404).json({ message: "Item not found" });
+    if (!item) {
+      await conn.close();
+      return res.status(404).json({ message: "Item not found" });
     }
 
-    if(item.quantity<quantity){
-        await conn.close();
-        return res.status(400).json({message: "Insufficient stock"})
+    if (item.quantity < quantity) {
+      await conn.close();
+      return res.status(400).json({ message: "Insufficient stock" });
     }
 
-    item.quantity-=quantity;
+    item.quantity -= quantity;
     await item.save();
 
     await conn.close();
 
     await Transaction.create({
-        buyerId,
-        sellerId,
-        productName:item.productName,
-        quantity,
-        price:item.price,
-        totalAmount:item.price*quantity,
-        isDeleted:false
+      buyerId,
+      sellerId,
+      productName: item.productName,
+      quantity,
+      price: item.price,
+      totalAmount: item.price * quantity,
+      isDeleted: false,
+    });
+
+    await Activity.create({
+      userId: buyerId,
+      action: "PURCHASE",
+      date: new Date(),
     });
 
     return res.status(200).json({
       message: "Purchase successful",
     });
-
   } catch (err) {
     console.error(err);
     return res
