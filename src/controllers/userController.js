@@ -59,7 +59,29 @@ exports.getNearbyUsersAuth = async (req, res) => {
 
     return res.json({ users });
   } catch (err) {
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(Error.INTERNAL_SERVER.status_code).json({ message: Error.INTERNAL_SERVER.message});
   }
 };
+
+exports.updateLocation = async (req, res) => {
+  try {
+    const { latitude, longitude } = req.body;
+
+    if (latitude == null || longitude == null) {
+      return res.status(400).json({ message: "Latitude and longitude required" });
+    }
+
+    await User.findByIdAndUpdate(req.userId, {
+      location: {
+        type: "Point",
+        coordinates: [Number(longitude), Number(latitude)],
+      },
+    });
+
+    return res.json({ message: "Location updated successfully" });
+  } catch (err) {
+    return res.status(Error.INTERNAL_SERVER.status_code).json({message: Error.INTERNAL_SERVER.message});
+  }
+};
+
 
