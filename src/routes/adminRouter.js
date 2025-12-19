@@ -7,6 +7,6 @@ const {getAdminStats,userAcquisitionGraph,userActivityGraph} = require("../contr
 
 router.get("/stats", auth, admin, getAdminStats);
 router.get("/graphs/users", auth, admin, userAcquisitionGraph);
-// router.get("/graphs/activity", auth, admin, userActivityGraph);
+router.get("/graphs/activity", auth, admin, userActivityGraph);
 
 module.exports = router;
