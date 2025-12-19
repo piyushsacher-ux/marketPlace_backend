@@ -48,3 +48,31 @@ exports.getAdminStats = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+
+exports.userAcquisitionGraph=async(req,res)=>{
+  const last7d=new Date(Date.now()- 7*24*60*60*1000);
+
+  const data=await User.aggregate([
+    {
+      $match:{
+        isDeleted:false,
+        createdAt:{$gte:last7d}
+      },
+    },
+    {
+      $group:{
+        _id:{
+          $dateToString:{
+            format:"%Y-%m-%d",
+            date:"$createdAt"
+          }
+        },
+        count:{$sum:1}
+      }
+    },
+    {
+      $sort:{_id:1}
+    }
+  ])
+  res.json(data);
+}
