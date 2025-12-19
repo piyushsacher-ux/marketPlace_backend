@@ -26,18 +26,14 @@ const inventorySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-
 inventorySchema.post("save", function (doc) {
   console.log("Inventory Created");
   console.log(doc);
 });
 
-
 inventorySchema.pre("findOneAndUpdate", async function (next) {
   this._oldDoc = await this.model.findOne(this.getQuery());
-  next();
 });
-
 
 inventorySchema.post("findOneAndUpdate", function (doc) {
   console.log("Inventory Updated");
