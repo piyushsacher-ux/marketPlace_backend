@@ -6,6 +6,7 @@ const { generateOTP, hashOTP, compareOTP } = require("../utils/otp");
 const { sendOtpEmail } = require("../utils/mailer");
 const jwt = require("jsonwebtoken");
 const Activity = require("../models/activityModel");
+const Admin=require("../models/adminModel")
 
 exports.register = async (req, res) => {
   try {
