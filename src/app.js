@@ -8,6 +8,7 @@ const authRoutes=require("./routes/authRouter")
 const cookieParser = require("cookie-parser");
 const userRoutes=require("./routes/userRouter")
 const inventoryRoutes=require("./routes/inventoryRouter")
+const purchaseRoutes=require("./routes/purchaseRouter")
 
 const port=process.env.PORT || 3000;
 
@@ -18,6 +19,7 @@ app.use("/public", express.static(path.join(__dirname, "public")));
 app.use("/api/auth", authRoutes);
 app.use("/api/users",userRoutes);
 app.use("/api/inventory",inventoryRoutes)
+app.use("/api/purchase",purchaseRoutes);
 
 app.get("/", (req, res) => {
   res.send("Marketplace API is running");
