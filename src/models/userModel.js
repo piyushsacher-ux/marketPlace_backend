@@ -5,7 +5,6 @@ const userSchema = new mongoose.Schema(
     email: {
       type: String,
       required: true,
-      unique: true,
       index: true,
       lowercase: true,
       trim: true,
@@ -41,13 +40,16 @@ const userSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
-    lastActiveAt: {
-      type: Date,
-      default: null,
-      index: true,
-    },
   },
   { timestamps: true }
+);
+
+userSchema.index(
+  { email: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { isDeleted: false },
+  }
 );
 
 userSchema.index({ location: "2dsphere" });

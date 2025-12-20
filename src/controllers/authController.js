@@ -6,7 +6,7 @@ const { generateOTP, hashOTP, compareOTP } = require("../utils/otp");
 const { sendOtpEmail } = require("../utils/mailer");
 const jwt = require("jsonwebtoken");
 const Activity = require("../models/activityModel");
-const Admin=require("../models/adminModel")
+const Admin = require("../models/adminModel");
 
 exports.register = async (req, res) => {
   try {
@@ -15,32 +15,15 @@ exports.register = async (req, res) => {
     if (!email || !username || !password || !latitude || !longitude) {
       return res.status(400).json({ message: "All fields are required" });
     }
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      if (existingUser.isDeleted) {
-        return res.status(Error.FORBIDDEN.status_code).json({
-          ...Error.FORBIDDEN,
-          message: "Account with this email has been deactivated",
-        });
-      }
-      if (existingUser.isEmailVerified) {
-        return res
-          .status(Error.USER_ALREADY_EXISTS.status_code)
-          .json(Error.USER_ALREADY_EXISTS);
-      }
+    const activeUser = await User.findOne({
+      email,
+      isDeleted: false,
+    });
 
-      const otpSession = await Session.findOne({
-        userId: existingUser._id,
-        type: "VERIFY_EMAIL",
-      });
-
-      if (otpSession) {
-        return res.status(400).json({
-          message: "OTP already sent. Please verify your email.",
-        });
-      }
-
-      await User.deleteOne({ _id: existingUser._id });
+    if (activeUser) {
+      return res
+        .status(Error.USER_ALREADY_EXISTS.status_code)
+        .json({ message: Error.USER_ALREADY_EXISTS.message });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -56,14 +39,30 @@ exports.register = async (req, res) => {
         coordinates: [longitude, latitude],
       },
     });
+
     const otp = generateOTP();
     const otpHash = await hashOTP(otp);
+
+    await Session.deleteMany({
+      userId: user._id,
+      type: "VERIFY_EMAIL",
+    });
 
     await Session.create({
       userId: user._id,
       type: "VERIFY_EMAIL",
       otpHash,
       expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+    });
+
+    const verifyToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "5m",
+    });
+
+    res.cookie("verify_token", verifyToken, {
+      httpOnly: true,
+      sameSite: "strict",
+      maxAge: 5 * 60 * 1000,
     });
 
     await sendOtpEmail({
@@ -86,18 +85,30 @@ exports.register = async (req, res) => {
 
 exports.verifyEmail = async (req, res) => {
   try {
-    const { email, otp } = req.body;
-    if (!email || !otp) {
+    const {otp} = req.body;
+    const token = req.cookies.verify_token;
+    if (!otp) {
       return res.status(Error.BAD_REQUEST.status_code).json(Error.BAD_REQUEST);
     }
+    if (!token) {
+      return res.status(401).json({ message: "Verification token expired" });
+    }
 
-    const user = await User.findOne({ email });
-    if (!user) {
+    const payload=jwt.verify(token,process.env.JWT_SECRET);
+    if(!payload) return res.status(401).json({ message: "Invalid or expired token" });
+
+    const {userId}=payload;
+  
+    const user = await User.findOne({_id:userId,isDeleted:false});
+    if (!user ) {
       return res.status(Error.NOT_FOUND.status_code).json(Error.NOT_FOUND);
+    }
+    if (user.isEmailVerified) {
+      return res.status(400).json({ message: "Email already verified" });
     }
 
     const session = await Session.findOne({
-      userId: user._id,
+      userId,
       type: "VERIFY_EMAIL",
     });
 
@@ -117,6 +128,8 @@ exports.verifyEmail = async (req, res) => {
     user.isEmailVerified = true;
     await user.save();
     await Session.deleteOne({ _id: session._id });
+    res.clearCookie("verify_token");
+
     return res.json({
       message: "Email verified successfully",
     });
@@ -124,7 +137,7 @@ exports.verifyEmail = async (req, res) => {
     console.error(err);
     return res
       .status(Error.INTERNAL_SERVER.status_code)
-      .json(Error.INTERNAL_SERVER);
+      .json({message:Error.INTERNAL_SERVER});
   }
 };
 
@@ -229,18 +242,15 @@ exports.forgotPassword = async (req, res) => {
       expiresAt: new Date(Date.now() + 30 * 60 * 1000),
     });
 
-    const resetToken = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: "30m" }
-    );
+    const resetToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "30m",
+    });
 
     res.cookie("reset_token", resetToken, {
       httpOnly: true,
       sameSite: "strict",
       maxAge: 30 * 60 * 1000,
     });
-
 
     await sendOtpEmail({
       to: user.email,
@@ -258,7 +268,6 @@ exports.forgotPassword = async (req, res) => {
       .json({ message: Error.INTERNAL_SERVER.message });
   }
 };
-
 
 exports.resetPassword = async (req, res) => {
   try {
@@ -356,8 +365,3 @@ exports.logout = async (req, res) => {
     });
   }
 };
-
-
-
-
-
