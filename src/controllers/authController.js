@@ -196,3 +196,168 @@ exports.login = async (req, res) => {
       .json({ message: Error.INTERNAL_SERVER.message });
   }
 };
+
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res
+        .status(Error.BAD_REQUEST.status_code)
+        .json({ message: "Email is required" });
+    }
+
+    const user = await User.findOne({ email, isDeleted: false });
+    if (!user) {
+      return res
+        .status(Error.NOT_FOUND.status_code)
+        .json({ message: "User not found" });
+    }
+
+    const otp = generateOTP();
+    const otpHash = await hashOTP(otp);
+
+    await Session.deleteMany({
+      userId: user._id,
+      type: "FORGOT_PASSWORD",
+    });
+
+    await Session.create({
+      userId: user._id,
+      type: "FORGOT_PASSWORD",
+      otpHash,
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+    });
+
+    const resetToken = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "30m" }
+    );
+
+    res.cookie("reset_token", resetToken, {
+      httpOnly: true,
+      sameSite: "strict",
+      maxAge: 30 * 60 * 1000,
+    });
+
+
+    await sendOtpEmail({
+      to: user.email,
+      name: user.username,
+      otp,
+    });
+
+    return res.json({
+      message: "OTP sent to registered email",
+    });
+  } catch (err) {
+    console.error(err);
+    return res
+      .status(Error.INTERNAL_SERVER.status_code)
+      .json({ message: Error.INTERNAL_SERVER.message });
+  }
+};
+
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const { otp, newPassword } = req.body;
+    const token = req.cookies.reset_token;
+
+    if (!otp || !newPassword) {
+      return res
+        .status(Error.BAD_REQUEST.status_code)
+        .json({ message: "OTP and new password are required" });
+    }
+
+    if (!token) {
+      return res
+        .status(Error.UNAUTHORISED.status_code)
+        .json({ message: "Reset token missing or expired" });
+    }
+
+    let payload;
+    try {
+      payload = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res
+        .status(Error.UNAUTHORISED.status_code)
+        .json({ message: "Invalid or expired reset token" });
+    }
+
+    const { userId } = payload;
+
+    const user = await User.findOne({ _id: userId, isDeleted: false });
+    if (!user) {
+      return res
+        .status(Error.NOT_FOUND.status_code)
+        .json({ message: "User not found" });
+    }
+
+    const session = await Session.findOne({
+      userId,
+      type: "FORGOT_PASSWORD",
+    });
+
+    if (!session) {
+      return res
+        .status(Error.BAD_REQUEST.status_code)
+        .json({ message: "OTP expired or invalid" });
+    }
+
+    const isValidOtp = await bcrypt.compare(otp, session.otpHash);
+    if (!isValidOtp) {
+      return res
+        .status(Error.BAD_REQUEST.status_code)
+        .json({ message: "Invalid OTP" });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    await Session.deleteOne({ _id: session._id });
+    res.clearCookie("reset_token");
+
+    return res.json({
+      message: "Password reset successful",
+    });
+  } catch (err) {
+    console.error(err);
+    return res
+      .status(Error.INTERNAL_SERVER.status_code)
+      .json({ message: Error.INTERNAL_SERVER.message });
+  }
+};
+
+exports.logout = async (req, res) => {
+  try {
+    const token = req.cookies.token;
+
+    if (!token) {
+      return res.status(400).json({
+        message: "Already logged out",
+      });
+    }
+
+    await Session.deleteOne({
+      token,
+      type: "LOGIN",
+    });
+    res.clearCookie("token");
+
+    return res.json({
+      message: "Logout successful",
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+};
+
+
+
+
+
