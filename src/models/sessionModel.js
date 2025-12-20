@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 
 const sessionSchema = new mongoose.Schema(
   {
-    // ID of the user OR admin who owns this session
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
