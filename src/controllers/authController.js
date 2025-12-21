@@ -261,12 +261,6 @@ exports.resetPassword = async (req, res) => {
     const { otp, newPassword } = req.body;
     const token = req.cookies.reset_token;
 
-    if (!otp || !newPassword) {
-      return res
-        .status(Error.BAD_REQUEST.status_code)
-        .json({ message: "OTP and new password are required" });
-    }
-
     if (!token) {
       return res
         .status(Error.UNAUTHORISED.status_code)
