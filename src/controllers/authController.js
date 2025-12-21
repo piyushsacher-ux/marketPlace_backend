@@ -12,9 +12,6 @@ exports.register = async (req, res) => {
   try {
     const { email, username, password, latitude, longitude } = req.body;
 
-    if (!email || !username || !password || !latitude || !longitude) {
-      return res.status(400).json({ message: "All fields are required" });
-    }
     const activeUser = await User.findOne({
       email,
       isDeleted: false,
@@ -145,10 +142,6 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password required" });
-    }
-
     let account = await User.findOne({ email, isDeleted: false });
     let role = "USER";
 
@@ -213,12 +206,6 @@ exports.login = async (req, res) => {
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
-
-    if (!email) {
-      return res
-        .status(Error.BAD_REQUEST.status_code)
-        .json({ message: "Email is required" });
-    }
 
     const user = await User.findOne({ email, isDeleted: false });
     if (!user) {
