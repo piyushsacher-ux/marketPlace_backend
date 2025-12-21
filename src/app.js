@@ -23,10 +23,6 @@ app.use("/api/inventory",inventoryRoutes)
 app.use("/api/purchase",purchaseRoutes);
 app.use("/api/admin", adminRoutes);
 
-app.get("/", (req, res) => {
-  res.send("Marketplace API is running");
-});
-
 connectDB().then(async()=>{
     console.log("DB connected")
     await seedAll();
